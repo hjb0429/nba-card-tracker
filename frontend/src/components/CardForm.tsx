@@ -62,6 +62,8 @@ export function CardForm({ onSuccess, onCancel, editData }: Props) {
   const [notes, setNotes] = useState(editData?.notes || '')
   const [photo, setPhoto] = useState<File | null>(null)
   const [preview, setPreview] = useState(editData?.photo_path || '')
+  const [uploading, setUploading] = useState(false)
+  const [photoUrl, setPhotoUrl] = useState(editData?.photo_path || '')
 
   // Matching cards from database
   const [matchedCards, setMatchedCards] = useState<MatchedCard[]>([])
@@ -100,9 +102,33 @@ export function CardForm({ onSuccess, onCancel, editData }: Props) {
       })
   }, [playerId, seriesId, season])
 
-  function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
-    if (file) { setPhoto(file); setPreview(URL.createObjectURL(file)) }
+    if (!file) return
+    setPhoto(file)
+    setPreview(URL.createObjectURL(file))
+
+    // Auto-upload to cloud
+    setUploading(true)
+    try {
+      const reader = new FileReader()
+      reader.onload = async () => {
+        const base64 = reader.result as string
+        const res = await fetch('/api/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: base64 }),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setPhotoUrl(data.url)
+        }
+        setUploading(false)
+      }
+      reader.readAsDataURL(file)
+    } catch {
+      setUploading(false)
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -114,25 +140,25 @@ export function CardForm({ onSuccess, onCancel, editData }: Props) {
 
     const actualParallel = parallel === 'Custom' ? customParallel : parallel
 
-    const formData = new FormData()
-    formData.append('custom_name', customName || autoName)
-    formData.append('year', season)
-    formData.append('card_type', cardType)
-    formData.append('parallel', actualParallel)
-    if (numbering) formData.append('numbering', numbering)
-    if (cardType === 'insert' && insertName) formData.append('insert_name', insertName)
-    if (cardNumber) formData.append('card_number', cardNumber)
-    formData.append('purchase_price', purchasePrice || '0')
-    if (purchaseDate) formData.append('purchase_date', purchaseDate)
-    if (notes) formData.append('notes', notes)
-    if (photo) formData.append('photo', photo)
+    const body: any = {
+      custom_name: customName || autoName,
+      year: season,
+      card_type: cardType,
+      parallel: actualParallel,
+      numbering: numbering || null,
+      insert_name: cardType === 'insert' ? insertName : null,
+      card_number: cardNumber || null,
+      purchase_price: purchasePrice || '0',
+      purchase_date: purchaseDate || null,
+      notes: notes || null,
+      photo_path: photoUrl || null,
+    }
 
-    // If user selected a matched card, link to it directly
     if (selectedCardId) {
-      formData.append('card_id', selectedCardId)
+      body.card_id = selectedCardId
     } else {
-      formData.append('player_id', playerId)
-      formData.append('series_id', seriesId)
+      body.player_id = playerId
+      body.series_id = seriesId
     }
 
     const url = editData ? `/api/user-cards/${editData.id}` : '/api/user-cards'
@@ -140,8 +166,11 @@ export function CardForm({ onSuccess, onCancel, editData }: Props) {
 
     const res = await fetch(url, {
       method,
-      headers: { Authorization: `Bearer ${user!.token}` },
-      body: formData,
+      headers: {
+        'Authorization': `Bearer ${user!.token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
     })
 
     setSubmitting(false)

@@ -30,7 +30,7 @@ export function createUserCardRoutes(db: Database, saveFn: () => void): Router {
 
   // POST /api/user-cards — add a card
   router.post('/', (req: AuthRequest, res) => {
-    const { card_id, player_id, series_id, year, card_type, parallel, numbering, insert_name, card_number, custom_name, purchase_price, purchase_date, notes } = req.body;
+    const { card_id, player_id, series_id, year, card_type, parallel, numbering, insert_name, card_number, custom_name, purchase_price, purchase_date, notes, photo_path } = req.body;
 
     let resolvedCardId: number | null = card_id ? parseInt(card_id) : null;
 
@@ -72,7 +72,7 @@ export function createUserCardRoutes(db: Database, saveFn: () => void): Router {
         custom_name || null,
         purchase_price ? parseFloat(purchase_price) : null,
         purchase_date || null,
-        null,
+        photo_path || null,
         notes || null,
       ],
     );
@@ -85,15 +85,16 @@ export function createUserCardRoutes(db: Database, saveFn: () => void): Router {
 
   // PUT /api/user-cards/:id — update a card
   router.put('/:id', (req: AuthRequest, res) => {
-    const { custom_name, purchase_price, purchase_date, notes } = req.body;
+    const { custom_name, purchase_price, purchase_date, notes, photo_path } = req.body;
 
     db.run(
-      `UPDATE user_cards SET custom_name = ?, purchase_price = ?, purchase_date = ?, notes = ? WHERE id = ? AND user_id = ?`,
+      `UPDATE user_cards SET custom_name = ?, purchase_price = ?, purchase_date = ?, notes = ?, photo_path = ? WHERE id = ? AND user_id = ?`,
       [
         custom_name || null,
         purchase_price ? parseFloat(purchase_price) : null,
         purchase_date || null,
         notes || null,
+        photo_path || null,
         parseInt(req.params.id),
         req.userId!,
       ],
