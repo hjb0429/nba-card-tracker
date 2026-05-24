@@ -1,29 +1,6 @@
 import { Router } from 'express';
 import { Database } from 'sql.js';
-import multer from 'multer';
-import path from 'path';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
-
-// Configure multer for photo uploads
-const storage = multer.diskStorage({
-  destination: path.join(__dirname, '..', '..', 'uploads'),
-  filename: (_req, file, cb) => {
-    const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, unique + path.extname(file.originalname));
-  },
-});
-
-const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
-  fileFilter: (_req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
-      cb(null, true);
-    } else {
-      cb(new Error('只允许上传图片'));
-    }
-  },
-});
 
 export function createUserCardRoutes(db: Database, saveFn: () => void): Router {
   const router = Router();
@@ -52,9 +29,8 @@ export function createUserCardRoutes(db: Database, saveFn: () => void): Router {
   });
 
   // POST /api/user-cards — add a card
-  router.post('/', upload.single('photo'), (req: AuthRequest, res) => {
-    const { card_id, player_id, series_id, year, card_type, parallel, numbering, insert_name, card_number, custom_name, purchase_price, purchase_date, notes } = req.body;
-    const photoPath = req.file ? '/uploads/' + req.file.filename : null;
+  router.post('/', (req: AuthRequest, res) => {
+    const { card_id, player_id, series_id, year, card_type, parallel, numbering, insert_name, card_number, custom_name, purchase_price, purchase_date, notes, photo_path } = req.body;
 
     let resolvedCardId: number | null = card_id ? parseInt(card_id) : null;
 
@@ -96,7 +72,7 @@ export function createUserCardRoutes(db: Database, saveFn: () => void): Router {
         custom_name || null,
         purchase_price ? parseFloat(purchase_price) : null,
         purchase_date || null,
-        photoPath,
+        photo_path || null,
         notes || null,
       ],
     );
@@ -108,28 +84,21 @@ export function createUserCardRoutes(db: Database, saveFn: () => void): Router {
   });
 
   // PUT /api/user-cards/:id — update a card
-  router.put('/:id', upload.single('photo'), (req: AuthRequest, res) => {
-    const { custom_name, purchase_price, purchase_date, notes } = req.body;
-    const photoPath = req.file ? '/uploads/' + req.file.filename : undefined;
+  router.put('/:id', (req: AuthRequest, res) => {
+    const { custom_name, purchase_price, purchase_date, notes, photo_path } = req.body;
 
-    let sql = `UPDATE user_cards SET
-      custom_name = ?, purchase_price = ?, purchase_date = ?, notes = ?`;
-    const params: any[] = [
-      custom_name || null,
-      purchase_price ? parseFloat(purchase_price) : null,
-      purchase_date || null,
-      notes || null,
-    ];
-
-    if (photoPath) {
-      sql += ', photo_path = ?';
-      params.push(photoPath);
-    }
-
-    sql += ' WHERE id = ? AND user_id = ?';
-    params.push(parseInt(req.params.id), req.userId!);
-
-    db.run(sql, params);
+    db.run(
+      `UPDATE user_cards SET custom_name = ?, purchase_price = ?, purchase_date = ?, notes = ?, photo_path = ? WHERE id = ? AND user_id = ?`,
+      [
+        custom_name || null,
+        purchase_price ? parseFloat(purchase_price) : null,
+        purchase_date || null,
+        notes || null,
+        photo_path || null,
+        parseInt(req.params.id),
+        req.userId!,
+      ],
+    );
     save();
     res.json({ ok: true });
   });
