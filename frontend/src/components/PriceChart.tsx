@@ -198,8 +198,8 @@ export function PriceChart({ cardId }: { cardId: number }) {
                 fontSize: 12,
               }}
               labelFormatter={(d) => `日期: ${d}`}
-              formatter={(value: number, name: string) => [
-                `¥${value.toFixed(2)}`,
+              formatter={(value, name) => [
+                `¥${Number(value).toFixed(2)}`,
                 name === 'overseas' ? '海外(eBay折合)' : '国内(卡淘)',
               ]}
             />
