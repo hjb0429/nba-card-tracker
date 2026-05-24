@@ -2,9 +2,9 @@
   command = "npm run build"
   publish = "dist"
 
-[[redirects]]
+to = "https://easygoing-analysis-production.up.railway.app/api/:splat"
   from = "/api/*"
-  to = "https://nba-card-api.up.railway.app/api/:splat"
+  to = "https://easygoing-analysis-production.up.railway.app/api/:splat"
   status = 200
 
 [[redirects]]
