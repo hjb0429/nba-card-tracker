@@ -148,7 +148,7 @@ export function generateMockPrices(db: Database): void {
     else if (num.includes('/49')) basePrice *= 1.8;
     else if (num.includes('/99')) basePrice *= 1.3;
 
-    for (let daysAgo = 365; daysAgo >= 0; daysAgo -= 3) {
+    for (let daysAgo = 365; daysAgo >= 0; daysAgo -= 14) {
       const date = new Date(today);
       date.setDate(date.getDate() - daysAgo);
       const dateStr = date.toISOString().split('T')[0];
@@ -160,7 +160,7 @@ export function generateMockPrices(db: Database): void {
       db.run(insertPrice, [cardId, price, 'USD', 'eBay', 'overseas', dateStr]);
       inserted++;
 
-      if (daysAgo % 7 < 3) {
+      if (daysAgo % 28 < 14) {
         const domesticPrice = Math.round((price * 7.0 + (Math.random() - 0.5) * 50) * 100) / 100;
         db.run(insertPrice, [cardId, domesticPrice, 'CNY', '卡淘', 'domestic', dateStr]);
         inserted++;
