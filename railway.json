@@ -1,0 +1,8 @@
+{
+  "services": {
+    "backend": {
+      "rootDirectory": "backend",
+      "startCommand": "npx tsx src/index.ts"
+    }
+  }
+}
