@@ -122,6 +122,8 @@ async function initDatabase(): Promise<Database> {
 }
 
 function saveDatabase(): void {
+  const dir = path.dirname(DB_PATH);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   const data = db.export();
   const buffer = Buffer.from(data.buffer, data.byteOffset, data.byteLength);
   fs.writeFileSync(DB_PATH, buffer);
