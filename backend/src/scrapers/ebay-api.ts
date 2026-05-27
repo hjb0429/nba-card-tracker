@@ -18,8 +18,8 @@ interface EbaySearchResponse {
   total?: number
 }
 
-const EBAY_APP_ID = process.env.EBAY_APP_ID || 'hjb-NBACardT-PRD-b4e87e45f-cb57b6f5'
-const EBAY_CERT_ID = process.env.EBAY_CERT_ID || 'PRD-4e87e45f3a02-d8dd-41d6-85d0-e819'
+const EBAY_APP_ID = process.env.EBAY_APP_ID || ''
+const EBAY_CERT_ID = process.env.EBAY_CERT_ID || ''
 
 async function getOAuthToken(): Promise<string> {
   const auth = Buffer.from(`${EBAY_APP_ID}:${EBAY_CERT_ID}`).toString('base64')
