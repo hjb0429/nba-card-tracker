@@ -1,5 +1,5 @@
 import { Database } from 'sql.js';
-import { scrapeEBayWithDelay } from '../scrapers/ebay';
+import { searchEbaySoldItems } from '../scrapers/ebay-api';
 import { scrapeKatouWithDelay } from '../scrapers/katou';
 
 interface ScrapeJob {
@@ -14,29 +14,31 @@ export async function scrapeCardPrices(db: Database, job: ScrapeJob): Promise<nu
   const today = new Date().toISOString().split('T')[0];
   let inserted = 0;
 
-  // --- eBay ---
+  // --- eBay API ---
   try {
-    const ebayListings = await scrapeEBayWithDelay(playerName, seriesName, year);
-    if (ebayListings.length > 0) {
-      for (const listing of ebayListings) {
-        if (listing.price > 0 && listing.price < 100000) {
+    const searchQuery = `${playerName} ${seriesName} ${year}`;
+    const ebayItems = await searchEbaySoldItems(searchQuery, 10);
+    if (ebayItems.length > 0) {
+      for (const item of ebayItems) {
+        const price = parseFloat(item.price?.value || '0');
+        if (price > 0 && price < 100000) {
           db.run(
             `INSERT INTO price_records (card_id, price, currency, source, source_market, record_date)
              VALUES (?, ?, 'USD', ?, 'overseas', ?)`,
-            [cardId, listing.price, listing.url || 'eBay-scraped', today],
+            [cardId, price, item.itemWebUrl || 'ebay-api', today],
           );
           inserted++;
-          if (listing.imageUrl) {
-            db.run(`UPDATE cards SET image_url = ? WHERE id = ? AND image_url IS NULL`, [listing.imageUrl, cardId]);
+          if (item.image?.imageUrl) {
+            db.run(`UPDATE cards SET image_url = ? WHERE id = ? AND image_url IS NULL`, [item.image.imageUrl, cardId]);
           }
         }
       }
-      console.log(`  [eBay] +${inserted} records for card #${cardId}`);
+      console.log(`  [eBay API] +${inserted} records for card #${cardId}`);
     } else {
-      console.log(`  [eBay] No results for card #${cardId} (may be blocked or no listings)`);
+      console.log(`  [eBay API] No results for card #${cardId}`);
     }
   } catch (err) {
-    console.error(`  [eBay] Error: ${(err as Error).message}`);
+    console.error(`  [eBay API] Error: ${(err as Error).message}`);
   }
 
   // --- 卡淘 ---
