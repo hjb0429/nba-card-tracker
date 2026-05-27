@@ -14,6 +14,7 @@ import { createAuthRoutes } from './api/auth';
 import { createUserCardRoutes } from './api/userCards';
 import { createCompareRoutes } from './api/compare';
 import { createOpportunityRoutes } from './api/opportunities';
+import { createLivePriceRoutes } from './api/live-prices';
 import { getExchangeRate } from './services/exchange-rate';
 import { runScraperBatch } from './services/scraper-scheduler';
 
@@ -115,7 +116,7 @@ async function initDatabase(): Promise<Database> {
   saveDatabase();
 
   seedIfEmpty(db);
-  generateMockPrices(db);
+  // generateMockPrices(db); // Disabled: use real eBay data instead
   saveDatabase();
 
   return db;
@@ -206,6 +207,7 @@ initDatabase().then((database) => {
   app.use('/api/user-cards', createUserCardRoutes(database, saveDatabase));
   app.use('/api/compare', createCompareRoutes(database));
   app.use('/api/opportunities', createOpportunityRoutes(database));
+  app.use('/api', createLivePriceRoutes(database));
 
   // Serve uploaded photos
   app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));

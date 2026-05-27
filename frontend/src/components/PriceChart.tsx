@@ -36,46 +36,43 @@ export function PriceChart({ cardId }: { cardId: number }) {
   const { usdToCny, formatCny } = useExchangeRate()
   const [stats, setStats] = useState<{ latest: number; change: number; changePercent: number } | null>(null)
 
+  const [liveData, setLiveData] = useState<any>(null)
+
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const [cardRes, priceRes, rateRes] = await Promise.all([
+      const [cardRes, rateRes, liveRes] = await Promise.all([
         fetch(`/api/cards/${cardId}`),
-        fetch(`/api/cards/${cardId}/prices?days=${days}`),
         fetch('/api/exchange-rate'),
+        fetch(`/api/cards/${cardId}/live-prices`),
       ])
       const card = await cardRes.json()
-      const prices: PriceRecord[] = await priceRes.json()
       const { rate } = await rateRes.json()
+      const live = await liveRes.json()
       setCardInfo(card)
+      setLiveData(live)
 
-      // Aggregate by date, convert USD to CNY
-      const byDate = new Map<string, { overseas: number[]; domestic: number[] }>()
-      for (const p of prices) {
-        if (!byDate.has(p.record_date)) {
-          byDate.set(p.record_date, { overseas: [], domestic: [] })
+      // Build chart from live prices
+      const prices = live.prices || []
+      if (prices.length > 0) {
+        const chartData: ChartData[] = prices
+          .filter((p: any) => p.price > 0)
+          .map((p: any, i: number) => ({
+            date: `#${i + 1}`,
+            overseas: Math.round(p.price * rate * 100) / 100,
+          }))
+
+        setData(chartData)
+
+        const cnyPrices = chartData.map((d) => d.overseas!).filter(Boolean)
+        if (cnyPrices.length >= 2) {
+          const avg = cnyPrices.reduce((a, b) => a + b, 0) / cnyPrices.length
+          const latest = cnyPrices[0]
+          const oldest = cnyPrices[cnyPrices.length - 1]
+          setStats({ latest, change: latest - oldest, changePercent: ((latest - oldest) / oldest) * 100 })
+        } else if (cnyPrices.length === 1) {
+          setStats({ latest: cnyPrices[0], change: 0, changePercent: 0 })
         }
-        const entry = byDate.get(p.record_date)!
-        if (p.source_market === 'overseas') entry.overseas.push(p.price * rate)
-        else entry.domestic.push(p.price)
-      }
-
-      const chartData: ChartData[] = []
-      for (const [date, d] of byDate) {
-        const point: ChartData = { date }
-        if (d.overseas.length) point.overseas = Math.round(d.overseas.reduce((a, b) => a + b, 0) / d.overseas.length * 100) / 100
-        if (d.domestic.length) point.domestic = Math.round(d.domestic.reduce((a, b) => a + b, 0) / d.domestic.length * 100) / 100
-        chartData.push(point)
-      }
-      chartData.sort((a, b) => a.date.localeCompare(b.date))
-      setData(chartData)
-
-      // Calculate stats in CNY
-      const overseasPrices = chartData.filter((d) => d.overseas).map((d) => d.overseas!)
-      if (overseasPrices.length >= 2) {
-        const latest = overseasPrices[overseasPrices.length - 1]
-        const oldest = overseasPrices[0]
-        setStats({ latest, change: latest - oldest, changePercent: ((latest - oldest) / oldest) * 100 })
       }
 
       setLoading(false)
@@ -100,8 +97,14 @@ export function PriceChart({ cardId }: { cardId: number }) {
       {/* Card info header */}
       {cardInfo && (
         <div className="flex items-center gap-3 mb-4">
-          <div className="w-11 h-11 rounded-full bg-accent-light flex items-center justify-center flex-shrink-0">
-            <span className="text-primary-deep font-bold">{cardInfo.player_name_cn?.charAt(0)}</span>
+          <div className="w-14 h-14 rounded-lg overflow-hidden flex-shrink-0 bg-accent-light border border-border">
+            {cardInfo.image_url ? (
+              <img src={cardInfo.image_url} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <span className="w-full h-full flex items-center justify-center text-primary-deep font-bold text-lg">
+                {cardInfo.player_name_cn?.charAt(0)}
+              </span>
+            )}
           </div>
           <div className="flex-1 min-w-0">
             <div className="font-semibold text-text">{cardInfo.player_name_cn} <span className="text-text-muted font-normal">{cardInfo.player_name}</span></div>
@@ -127,20 +130,18 @@ export function PriceChart({ cardId }: { cardId: number }) {
 
       {/* External price lookup links */}
       {cardInfo && (
-        <div className="flex flex-wrap gap-2 mb-4">
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          {liveData && (
+            <span className="text-xs bg-green-50 text-green-700 px-2 py-1 rounded-full font-medium">
+              ✓ eBay实时数据 ({liveData.total || 0}条)
+            </span>
+          )}
           <a
             href={`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(cardInfo.player_name + ' ' + cardInfo.series_name + ' ' + cardInfo.year + ' ' + (cardInfo.parallel || ''))}&LH_Sold=1&LH_Complete=1`}
             target="_blank" rel="noopener noreferrer"
             className="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border border-border text-text-muted hover:text-text hover:border-primary/30 transition-colors"
           >
             🔗 查看 eBay 成交价
-          </a>
-          <a
-            href={`https://www.cardhobby.com/market/search?keyword=${encodeURIComponent(cardInfo.player_name_cn || cardInfo.player_name)}`}
-            target="_blank" rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border border-border text-text-muted hover:text-text hover:border-primary/30 transition-colors"
-          >
-            🔗 查看 卡淘 成交价
           </a>
         </div>
       )}
