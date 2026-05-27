@@ -133,6 +133,24 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// eBay Marketplace Account Deletion notification endpoint (GDPR compliance)
+app.post('/api/ebay-notification', (req, res) => {
+  console.log('[eBay Notification] Received:', JSON.stringify(req.body).slice(0, 200));
+  // Always respond with 200 and the challenge code for verification
+  const challengeCode = req.body?.challengeCode;
+  if (challengeCode) {
+    const token = 'nba-card-tracker-verify';
+    const crypto = require('crypto');
+    const hash = crypto.createHmac('sha256', token).update(challengeCode).digest('hex');
+    res.json({ challengeResponse: hash });
+    return;
+  }
+  res.sendStatus(200);
+});
+app.get('/api/ebay-notification', (_req, res) => {
+  res.sendStatus(200);
+});
+
 // Exchange rate endpoint
 app.get('/api/exchange-rate', async (_req, res) => {
   const rate = await getExchangeRate();
