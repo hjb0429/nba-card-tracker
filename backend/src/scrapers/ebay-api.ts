@@ -52,7 +52,7 @@ export async function searchEbaySoldItems(
     const url = new URL('https://api.ebay.com/buy/browse/v1/item_summary/search')
     url.searchParams.set('q', query)
     url.searchParams.set('limit', String(limit))
-    url.searchParams.set('filter', 'buyingOptions:{FIXED_PRICE|AUCTION},itemLocationCountry:US')
+    url.searchParams.set('filter', 'buyingOptions:{FIXED_PRICE|AUCTION|BEST_OFFER}')
 
     const searchRes = await fetch(url.toString(), {
       headers: {
