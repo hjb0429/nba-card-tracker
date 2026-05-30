@@ -78,6 +78,7 @@ export function createLivePriceRoutes(db: Database): Router {
         total: items.length,
         prices,
         images: images.slice(0, 5),
+        error: error || null,
         searchUrl: `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}&LH_Sold=1&LH_Complete=1`,
       });
     } catch (err: any) {
