@@ -25,9 +25,8 @@ export function createLivePriceRoutes(db: Database): Router {
     const card = cardStmt.getAsObject() as any;
     cardStmt.free();
 
-    // Build search query (skip 'Base' to get broader results)
-    const parallelPart = card.parallel && card.parallel !== 'Base' ? ` ${card.parallel}` : '';
-    const query = `${card.player_name} ${card.series_name} ${card.year}${parallelPart}`;
+    // Build search query — keep it simple for eBay
+    const query = `${card.player_name} ${card.series_name}`;
 
     try {
       const items = await searchEbaySoldItems(query, 20);
