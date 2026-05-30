@@ -45,7 +45,7 @@ async function getOAuthToken(): Promise<string> {
 export async function searchEbaySoldItems(
   query: string,
   limit = 10,
-): Promise<EbayItemSummary[]> {
+): Promise<{ items: EbayItemSummary[]; error?: string }> {
   try {
     const token = await getOAuthToken()
 
@@ -63,14 +63,16 @@ export async function searchEbaySoldItems(
 
     if (!searchRes.ok) {
       const error = await searchRes.text()
-      throw new Error(`eBay search failed: ${searchRes.status} - ${error}`)
+      console.error(`[eBay API] Search failed: ${searchRes.status} - ${error}`)
+      return { items: [], error: `Search failed: ${searchRes.status}` }
     }
 
     const data = await searchRes.json() as EbaySearchResponse
     console.log(`[eBay API] Found ${data.itemSummaries?.length || 0} results for: ${query}`)
-    return data.itemSummaries || []
+    return { items: data.itemSummaries || [] }
   } catch (err) {
-    console.error(`[eBay API] Error: ${(err as Error).message}`)
-    return []
+    const msg = (err as Error).message
+    console.error(`[eBay API] Error: ${msg}`)
+    return { items: [], error: msg }
   }
 }
