@@ -94,5 +94,46 @@ export function createLivePriceRoutes(db: Database): Router {
     }
   });
 
+  // POST /api/cards/batch-images — fetch eBay images for multiple cards
+  router.post('/cards/batch-images', async (req, res) => {
+    const { cardIds } = req.body;
+    if (!cardIds || !Array.isArray(cardIds) || cardIds.length === 0) {
+      return res.status(400).json({ error: 'cardIds array required' });
+    }
+
+    const results: Record<number, string | null> = {};
+
+    for (const cardId of cardIds.slice(0, 10)) { // Max 10 at a time
+      // Check if we already have an image
+      const existing = db.exec('SELECT image_url FROM cards WHERE id = ? AND image_url IS NOT NULL', [cardId]);
+      if (existing[0]?.values?.length) {
+        results[cardId] = existing[0].values[0][0] as string;
+        continue;
+      }
+
+      // Fetch card info
+      const cardStmt = db.prepare(
+        'SELECT c.id, p.name as player_name, s.name as series_name FROM cards c JOIN players p ON c.player_id = p.id JOIN card_series s ON c.series_id = s.id WHERE c.id = ?',
+      );
+      cardStmt.bind([cardId]);
+      if (!cardStmt.step()) { cardStmt.free(); results[cardId] = null; continue; }
+      const card = cardStmt.getAsObject() as any;
+      cardStmt.free();
+
+      try {
+        const { items } = await searchEbaySoldItems(`${card.player_name} ${card.series_name}`, 5);
+        const imageUrl = items.find((i) => i.image?.imageUrl)?.image?.imageUrl || null;
+        if (imageUrl) {
+          db.run('UPDATE cards SET image_url = ? WHERE id = ?', [imageUrl, cardId]);
+        }
+        results[cardId] = imageUrl;
+      } catch {
+        results[cardId] = null;
+      }
+    }
+
+    res.json(results);
+  });
+
   return router;
 }

@@ -48,11 +48,11 @@ function PlayerAvatar({ playerId, name, team }: { playerId: number; name: string
   )
 }
 
-function CardImage({ card, player }: { card: Card; player: Player }) {
+function CardImage({ card, player, fetchedImage }: { card: Card; player: Player; fetchedImage?: string }) {
   const nbaUrl = getNBAHeadshotUrl(player.id)
   const c = teamColors[player.team] || { bg: '#F5EDD6', text: '#5B4A8C' }
   const badge = cardTypeBadge[card.card_type] || cardTypeBadge.base
-  const imgSrc = card.image_url || nbaUrl
+  const imgSrc = fetchedImage || card.image_url || nbaUrl
 
   return (
     <div className="relative w-full aspect-[3/4] rounded-lg overflow-hidden border border-border bg-gray-100 group">
@@ -114,6 +114,7 @@ export function MarketPage() {
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null)
   const [playerCards, setPlayerCards] = useState<Card[]>([])
   const [cardsLoading, setCardsLoading] = useState(false)
+  const [cardImages, setCardImages] = useState<Record<number, string>>({})
   const [selectedCardId, setSelectedCardId] = useState<number | null>(null)
   const [selectedSeriesId, setSelectedSeriesId] = useState<number | null>(null)
 
@@ -158,6 +159,29 @@ export function MarketPage() {
     }
     return Array.from(map.values())
   }, [playerCards, series])
+
+  // Fetch eBay images for visible cards
+  useEffect(() => {
+    if (!selectedSeriesId || filteredCards.length === 0) return
+    const idsWithoutImage = filteredCards.filter((c) => !c.image_url).map((c) => c.id)
+    if (idsWithoutImage.length === 0) return
+    fetch('/api/cards/batch-images', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cardIds: idsWithoutImage.slice(0, 10) }),
+    })
+      .then((r) => r.json())
+      .then((images: Record<number, string | null>) => {
+        setCardImages((prev) => {
+          const next = { ...prev }
+          for (const [id, url] of Object.entries(images)) {
+            if (url) next[Number(id)] = url
+          }
+          return next
+        })
+      })
+      .catch(() => {})
+  }, [selectedSeriesId, filteredCards.length])
 
   // Filter by selected series
   const filteredCards = selectedSeriesId
@@ -253,7 +277,7 @@ export function MarketPage() {
             {filteredCards.map((card) => (
               <button key={card.id} onClick={() => setSelectedCardId(card.id)}
                 className="text-left transition-transform hover:scale-105 active:scale-95">
-                <CardImage card={card} player={selectedPlayer} />
+                <CardImage card={card} player={selectedPlayer} fetchedImage={cardImages[card.id]} />
               </button>
             ))}
           </div>

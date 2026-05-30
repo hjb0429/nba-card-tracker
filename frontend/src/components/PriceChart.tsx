@@ -41,38 +41,64 @@ export function PriceChart({ cardId }: { cardId: number }) {
   useEffect(() => {
     async function load() {
       setLoading(true)
-      const [cardRes, rateRes, liveRes] = await Promise.all([
+      const [cardRes, rateRes] = await Promise.all([
         fetch(`/api/cards/${cardId}`),
         fetch('/api/exchange-rate'),
-        fetch(`/api/cards/${cardId}/live-prices`),
       ])
       const card = await cardRes.json()
       const { rate } = await rateRes.json()
-      const live = await liveRes.json()
       setCardInfo(card)
-      setLiveData(live)
 
-      // Build chart from live prices
-      const prices = live.prices || []
-      if (prices.length > 0) {
-        const chartData: ChartData[] = prices
-          .filter((p: any) => p.price > 0)
-          .map((p: any, i: number) => ({
-            date: `#${i + 1}`,
-            overseas: Math.round(p.price * rate * 100) / 100,
-          }))
+      // Try live eBay data first, fall back to cached prices
+      try {
+        const liveRes = await fetch(`/api/cards/${cardId}/live-prices`)
+        if (liveRes.ok) {
+          const live = await liveRes.json()
+          setLiveData(live)
 
-        setData(chartData)
+          const prices = live.prices || []
+          if (prices.length > 0) {
+            const chartData: ChartData[] = prices
+              .filter((p: any) => p.price > 0)
+              .map((p: any, i: number) => ({
+                date: `#${i + 1}`,
+                overseas: Math.round(p.price * rate * 100) / 100,
+              }))
+            setData(chartData)
 
-        const cnyPrices = chartData.map((d) => d.overseas!).filter(Boolean)
-        if (cnyPrices.length >= 2) {
-          const avg = cnyPrices.reduce((a, b) => a + b, 0) / cnyPrices.length
-          const latest = cnyPrices[0]
-          const oldest = cnyPrices[cnyPrices.length - 1]
-          setStats({ latest, change: latest - oldest, changePercent: ((latest - oldest) / oldest) * 100 })
-        } else if (cnyPrices.length === 1) {
-          setStats({ latest: cnyPrices[0], change: 0, changePercent: 0 })
+            const cnyPrices = chartData.map((d) => d.overseas!).filter(Boolean)
+            if (cnyPrices.length >= 1) {
+              const latest = cnyPrices[0]
+              const oldest = cnyPrices[cnyPrices.length - 1]
+              setStats({ latest, change: latest - oldest, changePercent: cnyPrices.length >= 2 ? ((latest - oldest) / oldest) * 100 : 0 })
+            }
+            setLoading(false)
+            return
+          }
         }
+      } catch { /* fallback */ }
+
+      // Fallback: load cached prices from DB
+      const priceRes = await fetch(`/api/cards/${cardId}/prices?days=${days}`)
+      const prices: any[] = await priceRes.json()
+
+      const byDate = new Map<string, number[]>()
+      for (const p of prices) {
+        if (!byDate.has(p.record_date)) byDate.set(p.record_date, [])
+        byDate.get(p.record_date)!.push(p.source_market === 'overseas' ? p.price * rate : p.price)
+      }
+
+      const chartData: ChartData[] = []
+      for (const [date, vals] of byDate) {
+        chartData.push({ date, overseas: Math.round(vals.reduce((a,b)=>a+b,0)/vals.length*100)/100 })
+      }
+      chartData.sort((a, b) => a.date.localeCompare(b.date))
+      setData(chartData)
+
+      if (chartData.length >= 2) {
+        const latest = chartData[chartData.length-1].overseas!
+        const oldest = chartData[0].overseas!
+        setStats({ latest, change: latest-oldest, changePercent: ((latest-oldest)/oldest)*100 })
       }
 
       setLoading(false)
