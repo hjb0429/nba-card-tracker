@@ -29,6 +29,8 @@ export function createLivePriceRoutes(db: Database): Router {
     const query = `${card.player_name} ${card.series_name}`;
 
     try {
+      const hasCreds = !!(process.env.EBAY_APP_ID && process.env.EBAY_CERT_ID);
+      console.log(`[Live] Search: "${query}" | Has creds: ${hasCreds}`);
       const items = await searchEbaySoldItems(query, 20);
 
       const today = new Date().toISOString().split('T')[0];
