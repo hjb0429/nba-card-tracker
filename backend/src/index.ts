@@ -116,7 +116,7 @@ async function initDatabase(): Promise<Database> {
   saveDatabase();
 
   seedIfEmpty(db);
-  // generateMockPrices(db); // Disabled: use real eBay data instead
+  generateMockPrices(db); // Only creates card structures, price data from eBay
   saveDatabase();
 
   return db;
